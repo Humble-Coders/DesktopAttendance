@@ -25,6 +25,10 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
+            implementation("com.google.firebase:firebase-admin:9.2.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.7.3")
+            implementation("com.google.cloud:google-cloud-storage:2.29.1")
         }
     }
 }
