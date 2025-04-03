@@ -9,36 +9,45 @@ import java.nio.file.Paths
 
 fun main() {
     // Define the path to your Firebase service account key file
-    val currentDir = System.getProperty("user.dir")
-    val credentialsPath = Paths.get(currentDir, "firebase-credentials.json").toString()
 
-    // Check if the credentials file exists
-    if (!File(credentialsPath).exists()) {
-        println("Error: Firebase credentials file not found at $credentialsPath")
-        println("Please place your firebase-credentials.json file in the project root directory.")
-        return
-    }
+        // Define the path to your Firebase service account key file
+        val currentDir = System.getProperty("user.dir")
 
-    try {
-        // Initialize Firebase with the path to credentials
-        JewelryAppInitializer.initialize(credentialsPath)
+        // The file is directly in the current directory, not in a nested composeApp directory
+        val credentialsPath = Paths.get(currentDir, "firebase-credentials.json").toString()
 
-        // Create and show the application window
-        application {
-            Window(
-                onCloseRequest = ::exitApplication,
-                title = "Jewelry Inventory",
-                state = rememberWindowState(width = 1280.dp, height = 800.dp)
-            ) {
-                // Get the ViewModel from the initializer
-                val viewModel = JewelryAppInitializer.getViewModel()
-
-                // Render the main app UI
-                JewelryApp(viewModel)
-            }
+        // Check if the credentials file exists
+        if (!File(credentialsPath).exists()) {
+            println("Error: Firebase credentials file not found at $credentialsPath")
+            println("Please place your firebase-credentials.json file in the project directory.")
+            return
         }
-    } catch (e: Exception) {
-        println("Error starting application: ${e.message}")
-        e.printStackTrace()
+
+        try {
+            // Initialize Firebase with the path to credentials
+            JewelryAppInitializer.initialize(credentialsPath)
+
+            // Create and show the application window
+            application {
+                Window(
+                    onCloseRequest = ::exitApplication,
+                    title = "Jewelry Inventory",
+                    state = rememberWindowState(width = 1280.dp, height = 800.dp)
+                ) {
+                    // Get the ViewModel from the initializer
+                    val viewModel = JewelryAppInitializer.getViewModel()
+
+                    // Render the main app UI
+                    JewelryApp(viewModel)
+                }
+            }
+        } catch (e: Exception) {
+            println("Error starting application: ${e.message}")
+            e.printStackTrace()
+        }
     }
-}
+
+
+
+
+

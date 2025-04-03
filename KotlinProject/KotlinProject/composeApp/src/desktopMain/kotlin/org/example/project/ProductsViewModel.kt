@@ -83,6 +83,7 @@ class ProductsViewModel(private val repository: ProductRepository) {
             try {
                 val product = repository.getProductById(productId)
                 _currentProduct.value = product
+                println("Product loaded for editing: $productId - ${product?.name}")
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = "Failed to get product: ${e.message}"

@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
@@ -215,6 +216,11 @@ fun JewelryApp(viewModel: ProductsViewModel) {
                             onEditProduct = { productId ->
                                 viewModel.selectProduct(productId)
                                 currentScreen = Screen.EDIT_PRODUCT
+                            },
+                            // Add this new property
+                            onViewProductDetails = { productId ->
+                                viewModel.selectProduct(productId)
+                                currentScreen = Screen.PRODUCT_DETAIL
                             }
                         )
 
@@ -239,6 +245,19 @@ fun JewelryApp(viewModel: ProductsViewModel) {
                                 currentScreen = Screen.DASHBOARD
                             },
                             isEditing = true
+                        )
+
+                        // Add the new product detail screen case
+                        Screen.PRODUCT_DETAIL -> ProductDetailScreen(
+                            viewModel = viewModel,
+                            imageLoader = imageLoader,
+                            onEdit = {
+                                // No need to select product again as it's already selected
+                                currentScreen = Screen.EDIT_PRODUCT
+                            },
+                            onBack = {
+                                currentScreen = Screen.DASHBOARD
+                            }
                         )
 
                         Screen.SETTINGS -> SettingsScreen()
@@ -317,7 +336,9 @@ fun DashboardScreen(
     viewModel: ProductsViewModel,
     imageLoader: ImageLoader,
     onAddProduct: () -> Unit,
-    onEditProduct: (String) -> Unit
+    onEditProduct: (String) -> Unit,
+    onViewProductDetails: (String) -> Unit  // Add this parameter
+
 ) {
     val products by remember { viewModel.products }
     val showDeleteDialog = remember { mutableStateOf(false) }
@@ -369,52 +390,28 @@ fun DashboardScreen(
                     .fillMaxWidth()
                     .background(Color(0xFFF5F5F5))
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
-                // Use Box containers with consistent width for each column
-                Spacer(modifier = Modifier.width(16.dp))
-                Box(modifier = Modifier.weight(0.15f)) {
-                    Text(
-                        "Image",
-                        fontWeight = FontWeight.Bold
-                    )
+                Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
+                    Text("Image", fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.weight(0.2f)) {
-                    Text(
-                        "Name",
-                        fontWeight = FontWeight.Bold
-                    )
+                Box(modifier = Modifier.weight(0.2f), contentAlignment = Alignment.CenterStart) {
+                    Text("Name", fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.weight(0.15f)) {
-                    Text(
-                        "Category",
-                        fontWeight = FontWeight.Bold
-                    )
+                Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
+                    Text("Category", fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.weight(0.15f)) {
-                    Text(
-                        "Material",
-                        fontWeight = FontWeight.Bold
-                    )
+                Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
+                    Text("Material", fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.weight(0.1f)) {
-                    Text(
-                        "Price",
-                        fontWeight = FontWeight.Bold
-                    )
+                Box(modifier = Modifier.weight(0.1f), contentAlignment = Alignment.CenterStart) {
+                    Text("Price", fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.weight(0.1f)) {
-                    Text(
-                        "Available",
-                        fontWeight = FontWeight.Bold
-                    )
+                Box(modifier = Modifier.weight(0.1f), contentAlignment = Alignment.CenterStart) {
+                    Text("Available", fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.weight(0.15f)) {
-                    Text(
-                        "Actions",
-                        fontWeight = FontWeight.Bold
-                    )
+                Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
+                    Text("Actions", fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -438,11 +435,12 @@ fun DashboardScreen(
                             product = product,
                             viewModel = viewModel,
                             imageLoader = imageLoader,
-                            onEdit = { onEditProduct(product.id) },
                             onDelete = {
                                 productToDelete.value = product.id
                                 showDeleteDialog.value = true
-                            }
+                            },
+                            // Add this new parameter
+                            onClick = { onViewProductDetails(product.id) }
                         )
                         Divider()
                     }
@@ -477,13 +475,16 @@ fun DashboardScreen(
     }
 }
 
+
+
+// Update the ProductRow function by replacing TableCell with consistent Box approach
 @Composable
 fun ProductRow(
     product: Product,
     viewModel: ProductsViewModel,
     imageLoader: ImageLoader,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
     var productImage by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -507,15 +508,14 @@ fun ProductRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick=onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Product image
         Box(
-            modifier = Modifier
-                .weight(0.15f)
-                .height(60.dp),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.weight(0.15f),
+            contentAlignment = Alignment.CenterStart
         ) {
             if (productImage != null) {
                 Image(
@@ -543,11 +543,41 @@ fun ProductRow(
             }
         }
 
-        // Product details
-        TableCell(text = product.name, weight = 0.2f)
-        TableCell(text = viewModel.getCategoryName(product.categoryId), weight = 0.15f)
-        TableCell(text = viewModel.getMaterialName(product.materialId), weight = 0.15f)
-        TableCell(text = "$${product.price}", weight = 0.1f)
+        // Name
+        Box(modifier = Modifier.weight(0.2f), contentAlignment = Alignment.CenterStart) {
+            Text(
+                text = product.name,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Category
+        Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
+            Text(
+                text = viewModel.getCategoryName(product.categoryId),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Material
+        Box(modifier = Modifier.weight(0.15f), contentAlignment = Alignment.CenterStart) {
+            Text(
+                text = viewModel.getMaterialName(product.materialId),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Price
+        Box(modifier = Modifier.weight(0.1f), contentAlignment = Alignment.CenterStart) {
+            Text(
+                text = "$${product.price}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         // Availability status
         Box(
@@ -573,50 +603,34 @@ fun ProductRow(
         }
 
         // Action buttons
-        Row(
+        Box(
             modifier = Modifier.weight(0.15f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            contentAlignment = Alignment.CenterStart
         ) {
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(Color(0xFFE3F2FD), CircleShape)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    tint = Color(0xFF1976D2)
-                )
-            }
 
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(Color(0xFFFFEBEE), CircleShape)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = Color(0xFFD32F2F)
-                )
+
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(Color(0xFFFFEBEE), CircleShape)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Color(0xFFD32F2F)
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-fun TableCell(text: String, weight: Float) {
-    Text(
-        text = text,
-        modifier = Modifier.fillMaxWidth(weight),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
-}
 
-// Add/Edit Product Screen
+
 @Composable
 fun AddEditProductScreen(
     viewModel: ProductsViewModel,
@@ -651,6 +665,12 @@ fun AddEditProductScreen(
     var materialExpanded by remember { mutableStateOf(false) }
     var materialTypeExpanded by remember { mutableStateOf(false) }
     var genderExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(product) {
+        if (isEditing) {
+            println("Editing product: ${product.id} - ${product.name}")
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -987,6 +1007,15 @@ fun AddEditProductScreen(
     }
 }
 
+
+
+
+// Make sure this update is correctly made in the ProductsViewModel
+// to ensure the product is properly loaded:
+
+// in ProductsViewModel class:
+
+
 // Settings Screen (placeholder)
 @Composable
 fun SettingsScreen() {
@@ -1019,12 +1048,350 @@ fun SettingsScreen() {
     }
 }
 
+// First, update the Screen enum by adding a PRODUCT_DETAIL entry:
+
+
+// Add this new composable for the product detail view
+@Composable
+fun ProductDetailScreen(
+    viewModel: ProductsViewModel,
+    imageLoader: ImageLoader,
+    onEdit: () -> Unit,
+    onBack: () -> Unit
+) {
+    val product = viewModel.currentProduct.value
+    val coroutineScope = rememberCoroutineScope()
+    var productImages by remember { mutableStateOf<List<Pair<String, ImageBitmap?>>>(emptyList()) }
+    var selectedImageIndex by remember { mutableStateOf(0) }
+
+    // Load all product images
+    LaunchedEffect(product) {
+        product?.let { p ->
+            if (p.images.isNotEmpty()) {
+                // Initialize the list with null images first
+                productImages = p.images.map { it to null }
+
+                // Load each image asynchronously
+                p.images.forEachIndexed { index, imageUrl ->
+                    coroutineScope.launch {
+                        val imageBytes = imageLoader.loadImage(imageUrl)
+                        imageBytes?.let {
+                            val image = withContext(Dispatchers.IO) {
+                                Image.makeFromEncoded(it).asImageBitmap()
+                            }
+                            // Update just this image in the list
+                            productImages = productImages.toMutableList().apply {
+                                this[index] = imageUrl to image
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Header with back button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+            Text(
+                text = "Product Details",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Button(
+                onClick = onEdit,
+                colors = ButtonDefaults.buttonColors(MaterialTheme.colors.primary)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit")
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Edit Product")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Display product info or placeholder if not available
+        product?.let { p ->
+            // Product Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = 4.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    // Product images with image gallery
+                    if (p.images.isNotEmpty()) {
+                        // Main selected image
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                                .background(Color(0xFFF5F5F5))
+                                .border(1.dp, Color(0xFFEEEEEE)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val currentImage = if (productImages.isNotEmpty() &&
+                                selectedImageIndex < productImages.size) {
+                                productImages[selectedImageIndex].second
+                            } else null
+
+                            if (currentImage != null) {
+                                Image(
+                                    bitmap = currentImage,
+                                    contentDescription = "Product Image",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                CircularProgressIndicator()
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Thumbnail row
+                        if (productImages.size > 1) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                productImages.forEachIndexed { index, (_, image) ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color(0xFFF5F5F5))
+                                            .border(
+                                                width = if (index == selectedImageIndex) 2.dp else 1.dp,
+                                                color = if (index == selectedImageIndex)
+                                                    MaterialTheme.colors.primary else Color(0xFFEEEEEE),
+                                                shape = RoundedCornerShape(4.dp)
+                                            )
+                                            .clickable { selectedImageIndex = index },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (image != null) {
+                                            Image(
+                                                bitmap = image,
+                                                contentDescription = "Thumbnail ${index + 1}",
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
+                    } else {
+                        // No images placeholder
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .background(Color(0xFFF5F5F5))
+                                .border(1.dp, Color(0xFFEEEEEE)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = Color.Gray
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("No images available", color = Color.Gray)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Product name and price
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = p.name,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "$${p.price}",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colors.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Status indicators (Available, Featured)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Available indicator
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .background(
+                                    if (p.available) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (p.available) "In Stock" else "Out of Stock",
+                                color = if (p.available) Color(0xFF388E3C) else Color(0xFFD32F2F),
+                                fontSize = 14.sp
+                            )
+                        }
+
+                        // Featured indicator
+                        if (p.featured) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .background(
+                                        Color(0xFFFFF8E1),
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Featured",
+                                    color = Color(0xFFFFA000),
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Divider()
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Product details section
+                    Text(
+                        text = "Product Details",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Product attributes in a grid
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        DetailRow("Category", viewModel.getCategoryName(p.categoryId))
+                        DetailRow("Material", viewModel.getMaterialName(p.materialId))
+                        if (p.materialType.isNotEmpty()) {
+                            DetailRow("Material Type", p.materialType)
+                        }
+                        if (p.gender.isNotEmpty()) {
+                            DetailRow("Gender", p.gender)
+                        }
+                        if (p.weight.isNotEmpty()) {
+                            DetailRow("Weight", p.weight)
+                        }
+                        DetailRow("Product ID", p.id)
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Description section
+                    Text(
+                        text = "Description",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = p.description.ifEmpty { "No description available" },
+                        color = if (p.description.isEmpty()) Color.Gray else Color.Unspecified
+                    )
+                }
+            }
+        } ?: run {
+            // Placeholder if product is null
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Product not found or still loading...",
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "$label:",
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.width(120.dp)
+        )
+        Text(
+            text = value,
+            color = Color.DarkGray
+        )
+    }
+}
+
+// You'll need to add the BrokenImage icon to your imports
+// Or you can import BackupRounded or other suitable icon
+
+// Also, you'll need to add ArrowBack to your imports:
+// import androidx.compose.material.icons.filled.ArrowBack
+
 // Screen enum for navigation
 enum class Screen {
     DASHBOARD,
     ADD_PRODUCT,
     EDIT_PRODUCT,
+    PRODUCT_DETAIL,
     SETTINGS
 }
+
 
 // Main function
