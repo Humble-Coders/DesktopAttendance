@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -44,15 +45,18 @@ import androidx.compose.material.SwitchDefaults
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -69,7 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -213,10 +217,6 @@ fun JewelryApp(viewModel: ProductsViewModel) {
                                 viewModel.createNewProduct()
                                 currentScreen = Screen.ADD_PRODUCT
                             },
-                            onEditProduct = { productId ->
-                                viewModel.selectProduct(productId)
-                                currentScreen = Screen.EDIT_PRODUCT
-                            },
                             // Add this new property
                             onViewProductDetails = { productId ->
                                 viewModel.selectProduct(productId)
@@ -336,7 +336,6 @@ fun DashboardScreen(
     viewModel: ProductsViewModel,
     imageLoader: ImageLoader,
     onAddProduct: () -> Unit,
-    onEditProduct: (String) -> Unit,
     onViewProductDetails: (String) -> Unit  // Add this parameter
 
 ) {
@@ -497,7 +496,7 @@ fun ProductRow(
                 val imageBytes = imageLoader.loadImage(imageUrl)
                 imageBytes?.let {
                     val image = withContext(Dispatchers.IO) {
-                        Image.makeFromEncoded(it).asImageBitmap()
+                        Image.makeFromEncoded(it).toComposeImageBitmap()
                     }
                     productImage = image
                 }
@@ -641,6 +640,7 @@ fun AddEditProductScreen(
     val product = viewModel.currentProduct.value ?: Product()
     val categories by remember { viewModel.categories }
     val materials by remember { viewModel.materials }
+    val imageLoader = JewelryAppInitializer.getImageLoader()
 
     // Form state
     var name by remember { mutableStateOf(product.name) }
@@ -653,6 +653,7 @@ fun AddEditProductScreen(
     var weight by remember { mutableStateOf(product.weight) }
     var available by remember { mutableStateOf(product.available) }
     var featured by remember { mutableStateOf(product.featured) }
+    var images by remember { mutableStateOf(product.images) }
 
     // Validation state
     var nameError by remember { mutableStateOf(false) }
@@ -735,10 +736,11 @@ fun AddEditProductScreen(
                         priceError = try {
                             it.toDouble() <= 0
                         } catch (e: NumberFormatException) {
+                            print(e)
                             true
                         }
                     },
-                    label = { Text("Price (Rs)") },  // Include the currency in the label
+                    label = { Text("Price (Rs)") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     isError = priceError,
@@ -940,8 +942,17 @@ fun AddEditProductScreen(
                     )
                 }
 
-                // Image URLs - in a real app, you'd have image upload functionality
-                // For now, we'll keep the existing images
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // Product Image Manager Component
+                ProductImageManager(
+                    existingImages = images,
+                    onImagesChanged = { updatedImages ->
+                        images = updatedImages
+                    },
+                    imageLoader = imageLoader,
+                    productId = product.id // Pass product ID for better organization in storage
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -965,6 +976,7 @@ fun AddEditProductScreen(
                             priceError = try {
                                 price.toDouble() <= 0
                             } catch (e: NumberFormatException) {
+                                print(e)
                                 true
                             }
                             categoryError = categoryId.isEmpty()
@@ -984,7 +996,7 @@ fun AddEditProductScreen(
                                     weight = weight,
                                     available = available,
                                     featured = featured,
-                                    images = product.images,
+                                    images = images,
                                     createdAt = product.createdAt
                                 )
 
@@ -1077,11 +1089,13 @@ fun ProductDetailScreen(
                         val imageBytes = imageLoader.loadImage(imageUrl)
                         imageBytes?.let {
                             val image = withContext(Dispatchers.IO) {
-                                Image.makeFromEncoded(it).asImageBitmap()
+                                Image.makeFromEncoded(it).toComposeImageBitmap()
                             }
                             // Update just this image in the list
-                            productImages = productImages.toMutableList().apply {
-                                this[index] = imageUrl to image
+                            val updatedList = productImages.toMutableList()
+                            if (index < updatedList.size) {
+                                updatedList[index] = imageUrl to image
+                                productImages = updatedList
                             }
                         }
                     }
@@ -1103,7 +1117,7 @@ fun ProductDetailScreen(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back"
                 )
             }
@@ -1139,11 +1153,11 @@ fun ProductDetailScreen(
                 ) {
                     // Product images with image gallery
                     if (p.images.isNotEmpty()) {
-                        // Main selected image
+                        // Main selected image with navigation arrows
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(300.dp)
+                                .height(350.dp)
                                 .background(Color(0xFFF5F5F5))
                                 .border(1.dp, Color(0xFFEEEEEE)),
                             contentAlignment = Alignment.Center
@@ -1163,17 +1177,93 @@ fun ProductDetailScreen(
                             } else {
                                 CircularProgressIndicator()
                             }
+
+                            // Add navigation arrows (only if there are multiple images)
+                            if (productImages.size > 1) {
+                                // Left arrow
+                                IconButton(
+                                    onClick = {
+                                        selectedImageIndex = if (selectedImageIndex > 0)
+                                            selectedImageIndex - 1
+                                        else
+                                            productImages.size - 1
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.CenterStart)
+                                        .size(48.dp)
+                                        .background(
+                                            color = Color(0x80000000),
+                                            shape = CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                        contentDescription = "Previous image",
+                                        tint = Color.White
+                                    )
+                                }
+
+                                // Right arrow
+                                IconButton(
+                                    onClick = {
+                                        selectedImageIndex = if (selectedImageIndex < productImages.size - 1)
+                                            selectedImageIndex + 1
+                                        else
+                                            0
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .size(48.dp)
+                                        .background(
+                                            color = Color(0x80000000),
+                                            shape = CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = "Next image",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Thumbnail row
+                        // Image pagination indicators
                         if (productImages.size > 1) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                for (i in productImages.indices) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 4.dp)
+                                            .size(10.dp)
+                                            .background(
+                                                color = if (i == selectedImageIndex)
+                                                    MaterialTheme.colors.primary
+                                                else
+                                                    Color.LightGray,
+                                                shape = CircleShape
+                                            )
+                                            .clickable { selectedImageIndex = i }
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
+                        // Thumbnail row
+                        if (productImages.size > 1) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                productImages.forEachIndexed { index, (_, image) ->
+                                items(productImages.size) { index ->
+                                    val (_, image) = productImages[index]
                                     Box(
                                         modifier = Modifier
                                             .size(80.dp)
@@ -1219,7 +1309,7 @@ fun ProductDetailScreen(
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(
-                                    Icons.Default.Refresh,
+                                    Icons.Default.Info,
                                     contentDescription = null,
                                     modifier = Modifier.size(64.dp),
                                     tint = Color.Gray
@@ -1245,7 +1335,7 @@ fun ProductDetailScreen(
                         )
 
                         Text(
-                            text = "$${p.price}",
+                            text = "₹${p.price}",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colors.primary

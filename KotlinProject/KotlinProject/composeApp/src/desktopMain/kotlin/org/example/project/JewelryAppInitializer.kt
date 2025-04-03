@@ -20,6 +20,8 @@ object JewelryAppInitializer {
     private lateinit var firebaseApp: FirebaseApp
     private lateinit var firestore: com.google.cloud.firestore.Firestore
     private lateinit var storage: Storage
+    private lateinit var bucketName: String
+    private lateinit var storageService: StorageService
 
     private var repository: ProductRepository? = null
     private var viewModel: ProductsViewModel? = null
@@ -48,6 +50,9 @@ object JewelryAppInitializer {
             // Get project ID from the credentials file for storage setup
             val projectId = extractProjectId(credentialsFile.readText())
 
+            // Set the bucket name based on the project ID
+            bucketName = "$projectId.appspot.com"
+
             val options = FirebaseOptions.builder()
                 .setCredentials(credentials)
                 .setProjectId(projectId)
@@ -63,6 +68,9 @@ object JewelryAppInitializer {
                 .build()
                 .service
 
+            // Initialize StorageService
+            storageService = StorageService(storage, bucketName)
+
             // Create dependencies
             repository = FirestoreProductRepository(firestore, storage)
             viewModel = ProductsViewModel(repository!!)
@@ -70,6 +78,7 @@ object JewelryAppInitializer {
 
             initialized = true
             println("Firebase initialized successfully with project ID: $projectId")
+            println("Storage bucket: $bucketName")
         } catch (e: Exception) {
             throw IllegalStateException("Failed to initialize Firebase: ${e.message}", e)
         }
@@ -84,15 +93,6 @@ object JewelryAppInitializer {
         val matchResult = projectIdPattern.find(jsonContent)
         return matchResult?.groupValues?.get(1)
             ?: throw IllegalArgumentException("Could not extract project_id from credentials file")
-    }
-
-    /**
-     * Get the product repository instance.
-     * @throws IllegalStateException If called before initialization
-     */
-    fun getRepository(): ProductRepository {
-        checkInitialized()
-        return repository!!
     }
 
     /**
@@ -114,6 +114,15 @@ object JewelryAppInitializer {
     }
 
     /**
+     * Get the storage service instance.
+     * @throws IllegalStateException If called before initialization
+     */
+    fun getStorageService(): StorageService {
+        checkInitialized()
+        return storageService
+    }
+
+    /**
      * Check if the app has been initialized.
      * @throws IllegalStateException If the app hasn't been initialized
      */
@@ -123,19 +132,4 @@ object JewelryAppInitializer {
         }
     }
 
-    /**
-     * Clean up resources when the app is shutting down.
-     */
-    fun shutdown() {
-        if (initialized) {
-            try {
-                viewModel?.onCleared()
-                FirebaseApp.getInstance().delete()
-                println("Firebase resources cleaned up successfully")
-            } catch (e: Exception) {
-                println("Error during shutdown: ${e.message}")
-            }
-            initialized = false
-        }
-    }
 }
