@@ -3,51 +3,27 @@ package org.example.project
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.LinearProgressIndicator
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.Text
+import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import java.awt.FileDialog
 import java.awt.Frame
@@ -73,6 +49,7 @@ fun ProductImageManager(
     var uploadProgress by remember { mutableStateOf(0f) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var imageToDelete by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Create a progress flow that we'll observe
     val progressFlow = remember { MutableStateFlow(0f) }
@@ -92,17 +69,26 @@ fun ProductImageManager(
         // Load each image asynchronously
         images.forEachIndexed { index, imageUrl ->
             coroutineScope.launch {
-                val imageBytes = imageLoader.loadImage(imageUrl)
-                imageBytes?.let {
-                    val bitmap = withContext(Dispatchers.IO) {
-                        Image.makeFromEncoded(it).toComposeImageBitmap()
+                try {
+                    println("Loading image: $imageUrl")
+                    val imageBytes = imageLoader.loadImage(imageUrl)
+                    if (imageBytes != null) {
+                        println("Image loaded, size: ${imageBytes.size} bytes")
+                        val bitmap = withContext(Dispatchers.IO) {
+                            Image.makeFromEncoded(imageBytes).asImageBitmap()
+                        }
+                        // Update just this image in the list
+                        val updatedList = imageDisplayList.toMutableList()
+                        if (index < updatedList.size) {
+                            updatedList[index] = imageUrl to bitmap
+                            imageDisplayList = updatedList
+                        }
+                    } else {
+                        println("Failed to load image: $imageUrl")
                     }
-                    // Update just this image in the list
-                    val updatedList = imageDisplayList.toMutableList()
-                    if (index < updatedList.size) {
-                        updatedList[index] = imageUrl to bitmap
-                        imageDisplayList = updatedList
-                    }
+                } catch (e: Exception) {
+                    println("Error loading image: ${e.message}")
+                    e.printStackTrace()
                 }
             }
         }
@@ -114,6 +100,34 @@ fun ProductImageManager(
             style = MaterialTheme.typography.h6,
             modifier = Modifier.padding(bottom = 8.dp)
         )
+
+        // Error message display
+        errorMessage?.let { error ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+                    .background(Color(0xFFFFEBEE), RoundedCornerShape(4.dp))
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = "Error",
+                    tint = Color.Red,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    error,
+                    color = Color.Red
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = { errorMessage = null }) {
+                    Text("✕", color = Color.Red)
+                }
+            }
+        }
 
         // Image gallery
         if (imageDisplayList.isNotEmpty()) {
@@ -186,31 +200,70 @@ fun ProductImageManager(
         // Upload button & progress indicator
         Button(
             onClick = {
-                coroutineScope.launch {
-                    val selectedFile = selectImageFile() ?: return@launch
+                // Use a safer approach to file selection
+                coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                        println("Opening file dialog...")
+                        // Create the file dialog on the IO dispatcher
+                        val fileDialog = FileDialog(Frame()).apply {
+                            mode = FileDialog.LOAD
+                            title = "Select Image"
+                            file = "*.jpg;*.jpeg;*.png;*.gif"
+                            isVisible = true
+                        }
 
-                    isUploading = true
-                    progressFlow.value = 0f
+                        val selectedFile = if (fileDialog.directory != null && fileDialog.file != null) {
+                            println("Selected file: ${fileDialog.directory}${fileDialog.file}")
+                            File(fileDialog.directory, fileDialog.file).takeIf { it.exists() }
+                        } else {
+                            println("No file selected or dialog cancelled")
+                            null
+                        }
 
-                    // Determine directory path based on product ID
-                    val directoryPath = if (productId.isNotEmpty()) {
-                        "products/$productId"
-                    } else {
-                        "products/${System.currentTimeMillis()}"
-                    }
+                        // If a file was selected, upload it
+                        if (selectedFile != null) {
+                            withContext(Dispatchers.Main) {
+                                isUploading = true
+                                progressFlow.value = 0f
+                                errorMessage = null
+                            }
 
-                    val imageUrl = storageService.uploadFile(
-                        Paths.get(selectedFile.absolutePath),
-                        directoryPath,
-                        progressFlow
-                    )
+                            // Determine directory path based on product ID
+                            val directoryPath = if (productId.isNotEmpty()) {
+                                "products/$productId"
+                            } else {
+                                "products/${System.currentTimeMillis()}"
+                            }
 
-                    isUploading = false
+                            println("Starting upload to $directoryPath")
+                            val imageUrl = storageService.uploadFile(
+                                Paths.get(selectedFile.absolutePath),
+                                directoryPath,
+                                progressFlow
+                            )
 
-                    if (imageUrl != null) {
-                        val updatedImages = images + imageUrl
-                        images = updatedImages
-                        onImagesChanged(updatedImages)
+                            withContext(Dispatchers.Main) {
+                                isUploading = false
+
+                                if (imageUrl != null) {
+                                    println("Upload successful: $imageUrl")
+                                    val updatedImages = images + imageUrl
+                                    images = updatedImages
+                                    onImagesChanged(updatedImages)
+                                } else {
+                                    errorMessage = "Failed to upload image. Please try again."
+                                    println("Upload failed, no URL returned")
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        println("Error selecting/uploading image: ${e.message}")
+                        e.printStackTrace()
+
+                        withContext(Dispatchers.Main) {
+                            isUploading = false
+                            errorMessage = "Error: ${e.message ?: "Unknown error"}"
+                        }
                     }
                 }
             },
@@ -259,12 +312,18 @@ fun ProductImageManager(
                             onImagesChanged(updatedImages)
 
                             // Then attempt to delete from Firebase Storage
-                            coroutineScope.launch {
-                                val deleted = storageService.deleteFile(urlToDelete)
-                                if (deleted) {
-                                    println("Successfully deleted image: $urlToDelete")
-                                } else {
-                                    println("Failed to delete image: $urlToDelete")
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    println("Deleting image: $urlToDelete")
+                                    val deleted = storageService.deleteFile(urlToDelete)
+                                    if (deleted) {
+                                        println("Successfully deleted image: $urlToDelete")
+                                    } else {
+                                        println("Failed to delete image: $urlToDelete")
+                                    }
+                                } catch (e: Exception) {
+                                    println("Error deleting image: ${e.message}")
+                                    e.printStackTrace()
                                 }
                             }
                         }
@@ -285,24 +344,5 @@ fun ProductImageManager(
                 }
             }
         )
-    }
-}
-
-/**
- * Opens a file dialog for selecting an image.
- * @return The selected File or null if cancelled
- */
-private fun selectImageFile(): File? {
-    val fileDialog = FileDialog(Frame()).apply {
-        mode = FileDialog.LOAD
-        title = "Select Image"
-        file = "*.jpg;*.jpeg;*.png;*.gif"
-        isVisible = true
-    }
-
-    return if (fileDialog.directory != null && fileDialog.file != null) {
-        File(fileDialog.directory, fileDialog.file).takeIf { it.exists() }
-    } else {
-        null
     }
 }

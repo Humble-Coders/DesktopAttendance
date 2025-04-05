@@ -13,11 +13,12 @@ import java.util.UUID
 
 /**
  * Utility class for handling Firebase Storage operations in desktop environment.
+ * With enhanced debugging and error handling.
  */
 class StorageService(private val storage: Storage, private val bucketName: String) {
 
     /**
-     * Uploads a file to Firebase Storage with progress tracking.
+     * Uploads a file to Firebase Storage with progress tracking and debugging.
      *
      * @param filePath Path to the local file to upload
      * @param directoryPath Optional directory path within the storage bucket
@@ -29,7 +30,18 @@ class StorageService(private val storage: Storage, private val bucketName: Strin
         directoryPath: String = "products",
         progressFlow: MutableStateFlow<Float>? = null
     ): String? = withContext(Dispatchers.IO) {
+        println("DEBUG: Starting file upload from: ${filePath}")
+
         try {
+            // Verify the file exists and is readable
+            val file = filePath.toFile()
+            if (!file.exists() || !file.canRead()) {
+                println("ERROR: File doesn't exist or can't be read: ${filePath}")
+                return@withContext null
+            }
+
+            println("DEBUG: File size: ${file.length()} bytes")
+
             // Generate a unique filename to avoid conflicts
             val uniqueId = UUID.randomUUID().toString()
             val originalFilename = filePath.fileName.toString()
@@ -40,48 +52,46 @@ class StorageService(private val storage: Storage, private val bucketName: Strin
                 "$directoryPath/$uniqueId"
             }
 
+            println("DEBUG: Storage path will be: $storageFilePath")
+            println("DEBUG: Bucket name: $bucketName")
+
             // Create a blob ID and info
             val blobId = BlobId.of(bucketName, storageFilePath)
             val blobInfo = BlobInfo.newBuilder(blobId)
                 .setContentType(getContentType(extension))
                 .build()
 
-            // Use FileChannel for better upload progress tracking
-            val fileSize = filePath.toFile().length()
-            val chunkSize = 256 * 1024 // 256KB chunks
+            println("DEBUG: Created BlobInfo with content type: ${getContentType(extension)}")
 
-            FileInputStream(filePath.toFile()).use { fis ->
-                val channel = fis.channel
-                val buffer = ByteBuffer.allocate(chunkSize)
+            // Use a simple approach for smaller files
+            val fileBytes = file.readBytes()
+            println("DEBUG: Read ${fileBytes.size} bytes from file")
 
-                var bytesUploaded = 0L
-                var bytesRead: Int
+            // Update progress to indicate reading is complete
+            progressFlow?.emit(0.2f)
 
-                // Create a writer for the upload
-                storage.writer(blobInfo).use { writer ->
-                    while (channel.read(buffer).also { bytesRead = it } > 0) {
-                        buffer.flip()
-                        val bytes = ByteArray(buffer.limit())
-                        buffer.get(bytes)
-                        writer.write(ByteBuffer.wrap(bytes))
-                        buffer.clear()
+            // Upload directly for simplicity
+            println("DEBUG: Starting upload to Firebase Storage")
+            try {
+                val blob = storage.create(blobInfo, fileBytes)
+                println("DEBUG: Upload completed. Blob size: ${blob.size}")
 
-                        bytesUploaded += bytesRead
-                        val progress = bytesUploaded.toFloat() / fileSize.toFloat()
-                        progressFlow?.emit(progress)
-                    }
-                }
+                // Ensure progress is complete
+                progressFlow?.emit(1.0f)
+
+                // Return the gs:// URL
+                val resultUrl = "gs://$bucketName/$storageFilePath"
+                println("DEBUG: Generated URL: $resultUrl")
+                return@withContext resultUrl
+            } catch (e: Exception) {
+                println("ERROR during storage.create: ${e.javaClass.simpleName}: ${e.message}")
+                e.printStackTrace()
+                return@withContext null
             }
-
-            // Ensure progress is complete
-            progressFlow?.emit(1.0f)
-
-            // Return the gs:// URL
-            "gs://$bucketName/$storageFilePath"
         } catch (e: Exception) {
-            println("Error uploading file: ${e.message}")
+            println("ERROR in uploadFile: ${e.javaClass.simpleName}: ${e.message}")
             e.printStackTrace()
-            null
+            return@withContext null
         }
     }
 
@@ -92,18 +102,27 @@ class StorageService(private val storage: Storage, private val bucketName: Strin
      * @return true if deletion was successful, false otherwise
      */
     suspend fun deleteFile(gsUrl: String): Boolean = withContext(Dispatchers.IO) {
+        println("DEBUG: Starting file deletion: $gsUrl")
+
         try {
             if (!gsUrl.startsWith("gs://")) {
+                println("ERROR: URL does not start with gs://: $gsUrl")
                 return@withContext false
             }
 
             val path = gsUrl.removePrefix("gs://$bucketName/")
-            val blobId = BlobId.of(bucketName, path)
+            println("DEBUG: Extracted storage path: $path")
 
-            storage.delete(blobId)
-            true
+            val blobId = BlobId.of(bucketName, path)
+            println("DEBUG: Created BlobId for bucket: $bucketName, path: $path")
+
+            val result = storage.delete(blobId)
+            println("DEBUG: Deletion result: $result")
+
+            result
         } catch (e: Exception) {
-            println("Error deleting file: ${e.message}")
+            println("ERROR in deleteFile: ${e.javaClass.simpleName}: ${e.message}")
+            e.printStackTrace()
             false
         }
     }
