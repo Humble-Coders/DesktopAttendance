@@ -1,4 +1,4 @@
-package org.example.project
+package org.example.project.data
 
 // Repository.kt
 import com.google.cloud.firestore.Firestore
@@ -17,7 +17,8 @@ interface ProductRepository {
     suspend fun getProductImage(url: String): ByteArray?
 }
 
-class FirestoreProductRepository(private val firestore: Firestore, private val storage: Storage) : ProductRepository {
+class FirestoreProductRepository(private val firestore: Firestore, private val storage: Storage) :
+    ProductRepository {
 
     override suspend fun getAllProducts(): List<Product> = withContext(Dispatchers.IO) {
         val productsCollection = firestore.collection("products")

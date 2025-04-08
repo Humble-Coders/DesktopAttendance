@@ -1,4 +1,4 @@
-package org.example.project
+package org.example.project.viewModels
 
 // ViewModel.kt
 import androidx.compose.runtime.State
@@ -8,6 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.example.project.data.Category
+import org.example.project.data.Material
+import org.example.project.data.Product
+import org.example.project.data.ProductRepository
 
 class ProductsViewModel(private val repository: ProductRepository) {
 

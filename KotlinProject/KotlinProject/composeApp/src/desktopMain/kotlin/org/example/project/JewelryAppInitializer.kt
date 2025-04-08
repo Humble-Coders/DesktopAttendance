@@ -6,6 +6,11 @@ import com.google.cloud.storage.StorageOptions
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.cloud.FirestoreClient
+import org.example.project.data.FirestoreProductRepository
+import org.example.project.data.ProductRepository
+import org.example.project.utils.ImageLoader
+import org.example.project.utils.StorageService
+import org.example.project.viewModels.ProductsViewModel
 import java.io.FileInputStream
 import java.nio.file.Path
 
@@ -51,7 +56,8 @@ object JewelryAppInitializer {
             val projectId = extractProjectId(credentialsFile.readText())
 
             // Set the bucket name based on the project ID
-            bucketName = "$projectId.appspot.com"
+            bucketName = "jewellery-app-f6302.firebasestorage.app"
+
 
             val options = FirebaseOptions.builder()
                 .setCredentials(credentials)

@@ -1,7 +1,8 @@
-package org.example.project
+package org.example.project.utils
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import org.example.project.data.ProductRepository
 import java.util.concurrent.ConcurrentHashMap
 
 // Image loading utility

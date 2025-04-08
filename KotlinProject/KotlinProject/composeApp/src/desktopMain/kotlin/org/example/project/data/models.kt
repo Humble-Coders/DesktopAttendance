@@ -1,4 +1,4 @@
-package org.example.project
+package org.example.project.data
 
 data class Product(
     val id: String = "",
